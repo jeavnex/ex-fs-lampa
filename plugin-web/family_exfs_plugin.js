@@ -214,7 +214,7 @@
             });
             Lampa.Controller.toggle('content');
         };
-        this.render = function () { return html; };
+        this.render = function (asNode) { return asNode ? html[0] : html; };
         this.pause = function () {};
         this.stop = function () {};
         this.destroy = function () { destroyed = true; if (activeFrame) activeFrame.remove(); scroll.destroy(); html.remove(); };

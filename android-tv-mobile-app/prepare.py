@@ -27,7 +27,7 @@ def replace(path, before, after, count=1):
     file.write_text(text.replace(before, after), encoding='utf-8')
 
 replace('app/build.gradle', 'applicationId "top.rootu.lampa"', 'applicationId "io.github.jeavnex.familycinema"')
-replace('app/build.gradle', 'versionCode getVersionCode()', 'versionCode (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInteger()')
+replace('app/build.gradle', 'versionCode getVersionCode()', 'versionCode = Integer.parseInt(System.getenv("GITHUB_RUN_NUMBER") ?: "1")')
 replace('app/build.gradle', 'versionName getVersionName()', 'versionName "1.0.${System.getenv("GITHUB_RUN_NUMBER") ?: "0"}"')
 replace('app/build.gradle', '"enableUpdate", "true"', '"enableUpdate", "false"')
 replace('app/build.gradle', '"defaultAppUrl", "\\"\\""', '"defaultAppUrl", "\\"https://jeavnex.github.io/ex-fs-lampa/lampa/\\""', count=2)
@@ -58,7 +58,6 @@ bridge = '''    @JavascriptInterface
     }
 
 '''
-replace('app/src/main/java/top/rootu/lampa/AndroidJS.kt', '    fun openBrowser(url: String) {', '    fun openBrowser(url: String) {')
 # Insert before the annotations of openBrowser to keep both methods annotated.
 replace('app/src/main/java/top/rootu/lampa/AndroidJS.kt', '    @JavascriptInterface\n    @org.xwalk.core.JavascriptInterface\n    fun openBrowser', bridge + '    @JavascriptInterface\n    @org.xwalk.core.JavascriptInterface\n    fun openBrowser')
 shutil.copy2(ROOT / 'overlay/FamilyPlayerActivity.kt', DEST / 'app/src/main/java/top/rootu/lampa/FamilyPlayerActivity.kt')

@@ -20,6 +20,7 @@ text = index.read_text(encoding='utf-8')
 if '</body>' not in text:
     raise SystemExit('Lampa index has no body tag.')
 text = text.replace('</body>', '<script>window.FAMILY_CINEMA_AUTO_START=true;</script><script src="../family_exfs_plugin.js"></script></body>')
+text = text.replace('<head>', '<head><script>if(!localStorage.getItem("language"))localStorage.setItem("language","ru");</script>', 1)
 index.write_text(text, encoding='utf-8')
 with (output / 'lampa-source.tar.gz').open('wb') as archive:
     subprocess.run(['git', '-C', str(web), 'archive', '--format=tar.gz', 'HEAD'], stdout=archive, check=True)
