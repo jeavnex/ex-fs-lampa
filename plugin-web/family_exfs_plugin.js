@@ -123,13 +123,15 @@
             });
         }
         function openExternal(url) {
-            if (window.Android && typeof Android.openBrowser === 'function') Android.openBrowser(url);
+            var bridge = window.AndroidJS || window.Android;
+            if (bridge && typeof bridge.openBrowser === 'function') bridge.openBrowser(url);
             else window.open(url, '_blank', 'noopener,noreferrer');
         }
         function play(item, player) {
             remember('history', item, 50);
-            if (window.Android && typeof Android.openFamilyPlayer === 'function') {
-                Android.openFamilyPlayer(player.url);
+            var bridge = window.AndroidJS || window.Android;
+            if (bridge && typeof bridge.openFamilyPlayer === 'function') {
+                bridge.openFamilyPlayer(player.url);
                 return;
             }
             // Web players are HTML documents, not media URLs for Lampa.Player.
