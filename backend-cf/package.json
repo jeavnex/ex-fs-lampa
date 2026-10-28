@@ -10,5 +10,5 @@
     "db:remote": "node scripts/guard.js && wrangler d1 execute family_cinema_db --remote --file=schema.sql",
     "deploy": "node scripts/guard.js && wrangler deploy"
   },
-  "devDependencies": { "wrangler": "4.45.0", "miniflare": "4.20251011.1" }
+  "devDependencies": { "wrangler": "4.155.0", "miniflare": "4.20251011.1" }
 }

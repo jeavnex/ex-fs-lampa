@@ -103,7 +103,7 @@
             finish();
         }
         function search() {
-            Lampa.Input.edit({ title: 'Название фильма или сериала', value: object.query || '', free: true, nosave: true }, function (query) {
+            Lampa.Input.edit({ title: 'Название фильма или сериала', value: object.query || '', free: true, nosave: true, nomic: true }, function (query) {
                 if (query && query.trim().length >= 2) push({ query: query.trim(), section: 'search', page: 1 });
                 else { self.start(); if (query) Lampa.Noty.show('Введите хотя бы 2 символа.'); }
             });
