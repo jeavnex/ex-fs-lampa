@@ -1,0 +1,16 @@
+node_modules/
+.wrangler/
+.env
+.env.*
+.dev.vars*
+local.properties
+*.jks
+*.keystore
+android-tv-mobile-app/generated/
+android-tv-mobile-app/upstream/
+*.apk
+*.aab
+.gradle/
+__pycache__/
+.build/
+.pages/

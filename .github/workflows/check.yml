@@ -1,0 +1,22 @@
+name: Check Family Cinema
+on:
+  push:
+    branches: [main]
+    paths: ['backend-cf/**', 'plugin-web/**', '.github/workflows/check.yml']
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - run: npm ci --no-audit --no-fund
+        working-directory: backend-cf
+      - run: npm test
+        working-directory: backend-cf
+      - run: node --check plugin-web/family_exfs_plugin.js

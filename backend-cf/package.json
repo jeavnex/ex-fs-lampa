@@ -1,0 +1,14 @@
+{
+  "name": "family-cinema-api",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "test": "node --test test/*.test.js",
+    "db:local": "wrangler d1 execute family_cinema_db --local --file=schema.sql",
+    "db:remote": "node scripts/guard.js && wrangler d1 execute family_cinema_db --remote --file=schema.sql",
+    "deploy": "node scripts/guard.js && wrangler deploy"
+  },
+  "devDependencies": { "wrangler": "4.45.0", "miniflare": "4.20251011.1" }
+}

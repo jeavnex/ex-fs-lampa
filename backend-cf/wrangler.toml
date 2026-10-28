@@ -1,0 +1,14 @@
+name = "family-cinema-api"
+main = "src/index.js"
+compatibility_date = "2025-10-24"
+account_id = "78b2e8eb9b4aa24ca9f8e6c6ae79c9d3"
+workers_dev = true
+preview_urls = false
+
+[[d1_databases]]
+binding = "FAMILY_DB"
+database_name = "family_cinema_db"
+database_id = "dcc2f29e-5453-48cc-b617-e499e7bc8586"
+
+[observability]
+enabled = false

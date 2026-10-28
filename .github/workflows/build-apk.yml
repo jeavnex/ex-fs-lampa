@@ -1,0 +1,61 @@
+name: Build FamilyCinema.apk
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['android-tv-mobile-app/**', 'plugin-web/family_exfs_plugin.js', '.github/workflows/build-apk.yml']
+permissions:
+  contents: read
+concurrency:
+  group: family-apk-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+      - name: Load pinned original LAMPA
+        uses: actions/checkout@v7
+        with:
+          repository: lampa-app/LAMPA
+          ref: 28d7616f52d969abd6a93d8692b15a8525b36efc
+          path: .build/lampa-upstream
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Prepare complete Family Cinema sources
+        run: python3 android-tv-mobile-app/prepare.py "$GITHUB_WORKSPACE/.build/lampa-upstream"
+      - name: Install Android SDK components
+        run: sdkmanager 'platforms;android-34' 'build-tools;34.0.0'
+      - name: Build signed APK
+        working-directory: android-tv-mobile-app/generated
+        env:
+          KEYSTORE_BASE64: ${{ secrets.FAMILY_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.FAMILY_KEYSTORE_PASSWORD }}
+          RELEASE_SIGN_KEY_ALIAS: ${{ secrets.FAMILY_KEY_ALIAS }}
+          RELEASE_SIGN_KEY_PASSWORD: ${{ secrets.FAMILY_KEY_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          mkdir -p "$GITHUB_WORKSPACE/apk-output"
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            export KEYSTORE_FILE="$RUNNER_TEMP/family-release.jks"
+            python3 -c 'import os,base64,pathlib; p=pathlib.Path(os.environ["KEYSTORE_FILE"]); p.write_bytes(base64.b64decode(os.environ["KEYSTORE_BASE64"])); p.chmod(0o600)'
+            ./gradlew --no-daemon assembleLiteRelease --stacktrace
+            cp app/build/outputs/apk/lite/release/app-lite-release.apk "$GITHUB_WORKSPACE/apk-output/FamilyCinema.apk"
+            rm -f "$KEYSTORE_FILE"
+            echo 'Постоянная подпись: APK можно устанавливать поверх предыдущей сборки с тем же ключом.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            ./gradlew --no-daemon assembleLiteDebug --stacktrace
+            cp app/build/outputs/apk/lite/debug/app-lite-debug.apk "$GITHUB_WORKSPACE/apk-output/FamilyCinema.apk"
+            echo 'Личная тестовая сборка с отладочной подписью. При другой подписи Android потребует удалить старое приложение; локальные данные удалятся.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+          sha256sum "$GITHUB_WORKSPACE/apk-output/FamilyCinema.apk" > "$GITHUB_WORKSPACE/apk-output/SHA256SUMS.txt"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: FamilyCinema
+          path: apk-output/*
+          retention-days: 1
+          if-no-files-found: error
