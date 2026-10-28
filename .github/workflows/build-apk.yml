@@ -28,6 +28,8 @@ jobs:
           java-version: '17'
       - name: Prepare complete Family Cinema sources
         run: python3 android-tv-mobile-app/prepare.py "$GITHUB_WORKSPACE/.build/lampa-upstream"
+      - name: Set up Android command-line tools
+        uses: android-actions/setup-android@v4
       - name: Install Android SDK components
         run: sdkmanager 'platforms;android-34' 'build-tools;34.0.0'
       - name: Build signed APK

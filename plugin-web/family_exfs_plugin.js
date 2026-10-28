@@ -143,8 +143,8 @@
             external.on('hover:enter click', function () { openExternal(player.url); });
             Lampa.Controller.add('family_player', {
                 toggle: function () { Lampa.Controller.collectionSet(overlay); Lampa.Controller.collectionFocus(close[0], overlay); },
-                left: function () { Lampa.Navigator.move('left'); }, right: function () { Lampa.Navigator.move('right'); },
-                up: function () { Lampa.Navigator.move('up'); }, down: function () { frame[0].focus(); }, back: leave
+                left: function () { window.Navigator.move('left'); }, right: function () { window.Navigator.move('right'); },
+                up: function () { window.Navigator.move('up'); }, down: function () { frame[0].focus(); }, back: leave
             });
             Lampa.Controller.toggle('family_player');
         }
@@ -206,10 +206,10 @@
             Lampa.Controller.add('content', {
                 link: self,
                 toggle: function () { Lampa.Controller.collectionSet(body); Lampa.Controller.collectionFocus(last || false, body); },
-                up: function () { if (Lampa.Navigator.canmove('up')) Lampa.Navigator.move('up'); else Lampa.Controller.toggle('head'); },
-                down: function () { Lampa.Navigator.move('down'); },
-                left: function () { if (Lampa.Navigator.canmove('left')) Lampa.Navigator.move('left'); else Lampa.Controller.toggle('menu'); },
-                right: function () { Lampa.Navigator.move('right'); },
+                up: function () { if (window.Navigator.canmove('up')) window.Navigator.move('up'); else Lampa.Controller.toggle('head'); },
+                down: function () { window.Navigator.move('down'); },
+                left: function () { if (window.Navigator.canmove('left')) window.Navigator.move('left'); else Lampa.Controller.toggle('menu'); },
+                right: function () { window.Navigator.move('right'); },
                 back: function () { Lampa.Activity.backward(); }
             });
             Lampa.Controller.toggle('content');
@@ -235,7 +235,7 @@
     var attempts = 0;
     var timer = setInterval(function () {
         attempts++;
-        if (window.Lampa && window.jQuery && Lampa.Component && Lampa.Listener && $('.menu .menu__list').length) { clearInterval(timer); start(); }
+        if (window.appready && window.Lampa && window.jQuery && Lampa.Component && Lampa.Listener && $('.menu .menu__list').length) { clearInterval(timer); start(); }
         else if (attempts > 180) { clearInterval(timer); console.error('Family Cinema: Lampa did not become ready within 90 seconds.'); }
     }, 500);
 })();
