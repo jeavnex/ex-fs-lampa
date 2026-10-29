@@ -52,6 +52,8 @@ class FamilyDeviceTest {
                 File(instrumentation.targetContext.filesDir,"android-ui.png").outputStream().use { screenshot.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it) }
                 throw error
             }
+            val homeScreenshot=instrumentation.uiAutomation.takeScreenshot()
+            File(instrumentation.targetContext.filesDir,"android-ui.png").outputStream().use { homeScreenshot.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it) }
             js(page,"document.getElementById('main').scrollTop=0;document.activeElement.blur();true")
             val before = (js(page,"document.getElementById('main').scrollTop") as Number).toInt()
             val start = SystemClock.uptimeMillis()
@@ -79,12 +81,10 @@ class FamilyDeviceTest {
             instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
             waitFor { js(page,"document.querySelector('main h1')?.textContent") == "Фильмы" }
             js(page,"document.querySelector('[data-route=home]').click();true")
-            waitFor { js(page,"document.querySelectorAll('.card').length") is Number }
-            Thread.sleep(1000)
-            val screenshot = instrumentation.uiAutomation.takeScreenshot()
-            File(instrumentation.targetContext.filesDir,"android-ui.png").outputStream().use { screenshot.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it) }
+            waitFor { (js(page,"document.querySelectorAll('.card').length") as Number).toInt()>5 }
+            Thread.sleep(4000) // Android's clipboard confirmation must finish before checking the exit dialog.
             instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
-            Thread.sleep(400)
+            waitFor(5000) { instrumentation.uiAutomation.rootInActiveWindow?.findAccessibilityNodeInfosByText("Выйти из приложения?")?.isNotEmpty()==true }
             assertFalse(activity!!.isFinishing)
             instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
         }

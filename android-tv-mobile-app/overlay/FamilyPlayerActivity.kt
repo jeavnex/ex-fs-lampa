@@ -17,10 +17,8 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
-import okhttp3.Request
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
-import java.io.FilterInputStream
 
 class FamilyPlayerActivity : Activity() {
     private lateinit var item: JSONObject
@@ -136,23 +134,9 @@ class FamilyPlayerActivity : Activity() {
                 if (uri.scheme in listOf("blob", "data")) return null
                 if (blocked(uri.host ?: "") && uri.path?.contains("xml") == true) return WebResourceResponse("application/xml", "utf-8", ByteArrayInputStream("<VAST version=\"3.0\"></VAST>".toByteArray()))
                 if (!permitted(uri)) return empty()
-                if (request.method != "GET") return null
-                return try {
-                    val builder = Request.Builder().url(uri.toString())
-                    request.requestHeaders.forEach { (name, value) -> if (!name.equals("Host", true) && !name.equals("Accept-Encoding", true)) builder.header(name, value) }
-                    val ref = if (request.isForMainFrame) "http://ex-fs.net/" else request.requestHeaders.entries.firstOrNull { it.key.equals("Referer", true) }?.value ?: "http://ex-fs.net/"
-                    builder.header("Referer", ref)
-                    CookieManager.getInstance().getCookie(uri.toString())?.let { builder.header("Cookie", it) }
-                    val response = FamilySupport.http.newCall(builder.build()).execute()
-                    val finalUri = Uri.parse(response.request().url().toString())
-                    if (!permitted(finalUri) || (request.isForMainFrame && finalUri.host !in hosts)) { response.close(); return empty() }
-                    response.headers("Set-Cookie").forEach { CookieManager.getInstance().setCookie(uri.toString(), it) }
-                    if (request.isForMainFrame && !response.isSuccessful) runOnUiThread { if (mine == generation) fallback("Плеер HTTP ${response.code()}") }
-                    val type = response.body()?.contentType(); val body = response.body() ?: run { response.close(); return empty() }
-                    val headers = response.headers().toMultimap().mapValues { it.value.joinToString(", ") }.filterKeys { !it.equals("Content-Encoding", true) && !it.equals("Transfer-Encoding", true) }
-                    val stream = object : FilterInputStream(body.byteStream()) { override fun close() { super.close(); response.close() } }
-                    WebResourceResponse(type?.let { "${it.type()}/${it.subtype()}" } ?: "application/octet-stream", type?.charset()?.name() ?: "utf-8", response.code().coerceIn(200, 599), response.message().ifBlank { "Response" }, headers, stream)
-                } catch (e: Exception) { FamilySupport.log("Media ${uri.host}: ${e.javaClass.simpleName}"); if (request.isForMainFrame) runOnUiThread { if (mine == generation) fallback("Нет ответа от ${uri.host}") }; empty() }
+                // WebView retains its own TLS, cookies, Range requests and provider Referer.
+                // The initial source Referer is supplied by loadUrl below; no video proxy is needed.
+                return null
             }
         }
         frame.addView(web, FrameLayout.LayoutParams(-1, -1)); web.loadUrl(url, mapOf("Referer" to "http://ex-fs.net/"))
