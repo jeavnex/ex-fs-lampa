@@ -6,7 +6,7 @@
   const post=data=>{try{window.FamilyMedia?.postMessage(JSON.stringify(data));}catch{}};
   let provider,lastSelection='',resumeNotBefore=0;
   const priorListen=window.listen;
-  window.listen=function(player){if(player&&player.videoElement){provider=player;if(typeof player.on==='function')player.on('playlistItem',item=>{restored=true;post({type:'selection',season:String(item.season??''),episode:String(item.episode??''),episode_id:String(item.id??'')});});}if(typeof priorListen==='function')priorListen(player);};
+  window.listen=function(player){if(player&&player.videoElement){provider=player;if(typeof player.on==='function')player.on('playlistItem',item=>{if(Date.now()>=resumeNotBefore)restored=true;post({type:'selection',season:String(item.season??''),episode:String(item.episode??''),episode_id:String(item.id??'')});});}if(typeof priorListen==='function')priorListen(player);};
   const venom=()=>provider||(window.app?.videoElement?window.app:null);
   function api(){for(const name of ['player','playerjs','pjs','app',...Object.keys(window).slice(-100)]){try{const d=Object.getOwnPropertyDescriptor(window,name);if(d?.value&&typeof d.value.api==='function')return d.value;}catch{}}}
   function video(){const all=Array.from(document.querySelectorAll('video'));return all.find(v=>v.currentSrc&&!v.error)||all[0];}
@@ -28,7 +28,7 @@
     const vp=venom(),selected=selection();
     if(!selectionRestored&&restore.episode_id&&vp?.config?.playlist&&typeof vp.changeEpisode==='function'){
       selectionRestored=true;
-      if(String(vp.config.playlist.current?.id)!==String(restore.episode_id)){const numeric=x=>/^\d+$/.test(String(x))?Number(x):x;vp.changeEpisode({id:numeric(restore.episode_id),season:numeric(restore.season),episode:numeric(restore.episode)});resumeNotBefore=Date.now()+3000;}
+      if(String(vp.config.playlist.current?.id)!==String(restore.episode_id)){const numeric=x=>/^\d+$/.test(String(x))?Number(x):x;resumeNotBefore=Date.now()+3000;vp.changeEpisode({id:numeric(restore.episode_id),season:numeric(restore.season),episode:numeric(restore.episode)});}
     }else restoreSelection();
     const identity=JSON.stringify(selected);if(lastSelection&&identity!==lastSelection){post({type:'selection',...selected});if(restored)restore.seconds=0;}lastSelection=identity;
     if(!restored&&Date.now()>=resumeNotBefore&&Number(restore.seconds)>10&&(v?.readyState>=1||duration>0)){try{const target=Math.min(Number(restore.seconds),Number.isFinite(duration)&&duration>0?Math.max(0,duration-5):Number(restore.seconds));if(p)p.api('seek',target);if(v)v.currentTime=target;restored=true;}catch{}}

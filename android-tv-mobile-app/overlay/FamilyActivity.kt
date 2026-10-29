@@ -53,7 +53,7 @@ class FamilyActivity : Activity() {
         FamilySupport.log("WebView ${web.settings.userAgentString}")
         web.postDelayed({ if (!uiReady && !isFinishing) AlertDialog.Builder(this).setTitle("Интерфейс не запустился").setMessage("Проверьте обновление Android System WebView. Технический отчёт можно открыть здесь.").setPositiveButton("Логи") { _, _ -> FamilySupport.diagnostics(this, "Local UI did not become ready") }.setNegativeButton("Закрыть", null).show() }, 15000)
         migrateLegacyFavorites()
-        web.postDelayed({ checkUpdate(false) }, 3500)
+        if (!BuildConfig.DEBUG) web.postDelayed({ checkUpdate(false) }, 3500)
     }
     inner class Bridge {
         @JavascriptInterface fun ready() { uiReady = true }
