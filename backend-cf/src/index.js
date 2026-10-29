@@ -46,6 +46,7 @@ async function rewrite(html, configure) {
 }
 
 async function parseListing(html, page, search = false, profile = 'primary', rootOverride = '') {
+  if (profile === 'alternate' && !search) return parseAlternateListing(html, page);
   const cards = [];
   let current;
   let navigation = '';
@@ -78,6 +79,20 @@ async function parseListing(html, page, search = false, profile = 'primary', roo
   const numbers = clean(navigation).match(/\d+/g)?.map(Number) || [];
   const hasNext = page < 50 && (numbers.some(n => n > page) || (search && total !== null && total > page * 30));
   return { items, page, has_next: hasNext, total };
+}
+
+async function parseAlternateListing(html, page) {
+  const candidates = []; let current; let next = false;
+  await rewrite(html, p => {
+    p.on('a[href]', { element(e) { current = {path:sourcePath(e.getAttribute('href')),title:'',poster:'',year:''}; candidates.push(current); }, text(t) { if(current) current.title += t.text; } });
+    p.on('a[href] img', { element(e) { if(!current)return;current.poster=imageUrl(e.getAttribute('data-src')||e.getAttribute('src'));const title=clean(e.getAttribute('alt')||e.getAttribute('title')).replace(/<[^>]*>/g,'').replace(/^Смотреть\s*[«"]?|[»"]?\s*онлайн$/gi,'').trim();if(title)current.title=title; } });
+    p.on('.nav-next a, .navigation a, .searchpages a', { element(e) { const href=e.getAttribute('href')||'';if(/page\/|search_start=/.test(href))next=true; } });
+  });
+  const merged = new Map();
+  for(const candidate of candidates){if(!candidate.path)continue;const old=merged.get(candidate.path)||{};merged.set(candidate.path,{...old,...candidate,title:clean(candidate.title)||old.title||'',poster:candidate.poster||old.poster||''});}
+  const items=Array.from(merged.values()).filter(c=>c.title&&c.poster).slice(0,60).map(c=>({...c,id:Number(c.path.match(/\/(\d+)-/)[1]),url:ORIGIN+c.path}));
+  if(!items.length)throw new ApiError(502,'SOURCE_FORMAT','Резервный разбор также не распознал карточки EX-FS.');
+  return {items,page,has_next:page<50&&next,total:null};
 }
 
 async function parseDetail(html, path) {
@@ -336,7 +351,7 @@ async function maintenance(env, ctx) {
     const search = await parseListing(searchHtml, 1, true, profile);
     if (!search.items.length) throw new Error('Search check produced no expected results');
     report.checks.push('homepage', 'menu', 'search');
-    const recent = await env.FAMILY_DB.prepare("SELECT cache_key FROM media_cache WHERE cache_key LIKE 'item:%' ORDER BY updated_at DESC LIMIT 3").all();
+    const recent = await env.FAMILY_DB.prepare("SELECT cache_key FROM media_cache WHERE cache_key LIKE 'item:%' ORDER BY updated_at ASC LIMIT 10").all();
     for (const row of recent.results || []) {
       const path = sourcePath(row.cache_key.slice(5));
       if (!path) continue;

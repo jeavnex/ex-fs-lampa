@@ -38,10 +38,13 @@ class FamilyPlayerActivity : Activity() {
     private var episode = ""
     private var previousMediaTime = -1.0
     private var lastSaved = 0L
+    private var lastProgress = 0L
+    private var paused = false
     private var confirmed = false
     private var failed = false
     private var active = true
     private var generation = 0
+    private var restoreAfterPause = false
     private val players get() = item.getJSONArray("players")
     private val hosts get() = (0 until players.length()).mapNotNull { Uri.parse(players.getJSONObject(it).optString("url")).host }.toSet()
     private val ads = listOf("doubleclick.net", "googlesyndication.com", "googleadservices.com", "adsterra.com", "popads.net", "popcash.net", "onclicka.com", "onclickalgo.com", "realsrv.com", "exoclick.com", "betweendigital.com", "1xbet.com", "1x-bet.com", "melbet.com", "mostbet.com", "1win.com", "trafficjunky.net", "advmaker.net", "adskeeper.com", "criteo.com", "propellerads.com")
@@ -49,6 +52,7 @@ class FamilyPlayerActivity : Activity() {
         override fun run() {
             if (isFinishing || !active) return
             if (!failed && !confirmed && SystemClock.elapsedRealtime() - selectedAt > 35000) fallback("Нет подтверждённого видео за 35 секунд")
+            if (!failed && confirmed && !paused && SystemClock.elapsedRealtime() - lastProgress > 45000) fallback("Видеопоток остановился на 45 секунд")
             FamilySupport.handler.postDelayed(this, 1000)
         }
     }
@@ -114,7 +118,9 @@ class FamilyPlayerActivity : Activity() {
                 return false
             }
             override fun onPageFinished(view: WebView, url: String) { if (!early && mine == generation) view.evaluateJavascript(script, null) }
-            override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) { if (request.isForMainFrame && mine == generation) fallback("WebView: ${error.errorCode}") }
+            override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) { if (android.os.Build.VERSION.SDK_INT >= 23 && request.isForMainFrame && mine == generation) fallback("WebView: ${error.errorCode}") }
+            @Suppress("DEPRECATION")
+            override fun onReceivedError(view: WebView, code: Int, description: String, url: String) { if (android.os.Build.VERSION.SDK_INT < 23 && mine == generation) fallback("WebView: $code") }
             override fun onReceivedHttpError(view: WebView, request: WebResourceRequest, response: WebResourceResponse) { if (request.isForMainFrame && mine == generation) fallback("Плеер HTTP ${response.statusCode}") }
             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
                 val uri = request.url
@@ -147,7 +153,11 @@ class FamilyPlayerActivity : Activity() {
             "media" -> {
                 val time = data.optDouble("seconds", -1.0); val length = data.optDouble("duration", 0.0)
                 if (!time.isFinite() || time < 0 || time > 864000 || !length.isFinite() || length < 0) return
-                if (previousMediaTime >= 0 && time > previousMediaTime + 0.2 && !data.optBoolean("paused")) { confirmed = true; status.text = "${players.getJSONObject(index).optString("title")} · ${FamilySupport.version()}" }
+                paused = data.optBoolean("paused")
+                if (previousMediaTime >= 0 && time > previousMediaTime + 0.2 && !paused) {
+                    if (!confirmed) FamilySupport.log("Playback clock advancing: ${item.optString("path")}")
+                    confirmed = true; lastProgress = SystemClock.elapsedRealtime(); status.text = "${players.getJSONObject(index).optString("title")} · ${FamilySupport.version()}"
+                }
                 previousMediaTime = time
                 if (confirmed) {
                     seconds = time; duration = length
@@ -166,7 +176,7 @@ class FamilyPlayerActivity : Activity() {
         FamilySupport.merge(this, item) { it.put("seconds", seconds).put("duration", duration).put("season", season).put("episode", episode).put("player", index).put("last_played", System.currentTimeMillis()) }
     }
     private fun fallback(reason: String) {
-        if (isFinishing || failed) return
+        if (isFinishing || failed || !active) return
         FamilySupport.log("Playback fallback: $reason"); save()
         val next = (1..players.length()).map { (index + it) % players.length() }.firstOrNull { it !in attempted }
         if (next != null) { select(next); return }
@@ -192,7 +202,7 @@ class FamilyPlayerActivity : Activity() {
         }
         return super.dispatchKeyEvent(event)
     }
-    override fun onPause() { active = false; save(); command("pause"); if (::web.isInitialized) web.onPause(); FamilySupport.handler.removeCallbacks(watchdog); super.onPause() }
-    override fun onResume() { super.onResume(); active = true; if (::web.isInitialized) { web.onResume(); selectedAt = SystemClock.elapsedRealtime(); FamilySupport.handler.removeCallbacks(watchdog); FamilySupport.handler.postDelayed(watchdog, 1000) } }
+    override fun onPause() { active = false; save(); command("pause"); if (::web.isInitialized) { web.onPause(); web.stopLoading(); web.loadUrl("about:blank"); restoreAfterPause = true }; FamilySupport.handler.removeCallbacks(watchdog); super.onPause() }
+    override fun onResume() { super.onResume(); active = true; if (::web.isInitialized) { web.onResume(); if (restoreAfterPause && !isFinishing) { restoreAfterPause = false; attempted.clear(); select(index) }; selectedAt = SystemClock.elapsedRealtime(); FamilySupport.handler.removeCallbacks(watchdog); FamilySupport.handler.postDelayed(watchdog, 1000) } }
     override fun onDestroy() { FamilySupport.handler.removeCallbacks(watchdog); if (::web.isInitialized) destroyWeb(); window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); super.onDestroy() }
 }

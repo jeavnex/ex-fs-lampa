@@ -35,13 +35,7 @@ jobs:
           arch: x86_64
           profile: pixel_2
           disable-animations: true
-          script: cd android-tv-mobile-app/generated && chmod +x gradlew && ./gradlew --no-daemon connectedDebugAndroidTest --stacktrace
-      - name: Collect bounded diagnostic evidence
-        if: always()
-        run: |
-          mkdir -p android-evidence
-          adb exec-out run-as io.github.jeavnex.familycinema cat files/playback-report.json > android-evidence/playback-report.json || true
-          adb exec-out run-as io.github.jeavnex.familycinema cat files/android-ui.png > android-evidence/android-ui.png || true
+          script: bash scripts/android-check.sh
       - uses: actions/upload-artifact@v7
         if: always()
         with:

@@ -37,7 +37,7 @@ object FamilySupport {
         .replace(BuildConfig.FAMILY_APP_KEY, "[app key]")
     @Synchronized fun log(message: String) {
         entries.addLast("${java.time.Instant.now()} ${clean(message).take(800)}")
-        while (entries.size > 120) entries.removeFirst()
+        while (entries.size > 120 || entries.sumOf { it.toByteArray(Charsets.UTF_8).size } > 24000) entries.removeFirst()
     }
     @Synchronized fun report(context: Context, reason: String) = JSONObject().put("version", version())
         .put("device", "${Build.MANUFACTURER} ${Build.MODEL}; Android ${Build.VERSION.RELEASE}; SDK ${Build.VERSION.SDK_INT}")

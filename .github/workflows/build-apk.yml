@@ -46,7 +46,10 @@ jobs:
           trap 'rm -f "$KEYSTORE_FILE"' EXIT
           python3 -c 'import os,base64,pathlib; p=pathlib.Path(os.environ["KEYSTORE_FILE"]); p.write_bytes(base64.b64decode(os.environ["KEYSTORE_BASE64"])); p.chmod(0o600)'
           chmod +x gradlew
-          ./gradlew --no-daemon assembleRelease lintRelease --stacktrace
+          ./gradlew --no-daemon assembleRelease lintRelease --stacktrace || {
+            python3 -c 'import pathlib,xml.etree.ElementTree as E; p=pathlib.Path("app/build/reports/lint-results-release.xml"); root=E.parse(p).getroot() if p.exists() else []; [print(i.attrib,[(x.get("file"),x.get("line")) for x in i.findall("location")]) for i in root if i.get("severity") in ("Error","Fatal")]'
+            exit 1
+          }
           mkdir -p "$GITHUB_WORKSPACE/apk-output"
           cp app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/apk-output/FamilyCinema.apk"
           cp version.json "$GITHUB_WORKSPACE/apk-output/version.json"
@@ -69,3 +72,9 @@ jobs:
           path: apk-output/*
           retention-days: 1
           if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: Android-build-diagnostics
+          path: android-tv-mobile-app/generated/app/build/reports/
+          retention-days: 1
