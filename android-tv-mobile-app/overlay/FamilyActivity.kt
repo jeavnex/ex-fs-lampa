@@ -121,7 +121,7 @@ class FamilyActivity : Activity() {
         old.loadDataWithBaseURL("https://jeavnex.github.io/ex-fs-lampa/lampa/", """<html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'"></head><body><script>try{FamilyMigration.accept(JSON.stringify({favorites:JSON.parse(localStorage.getItem('family_favorites')||'[]'),history:JSON.parse(localStorage.getItem('family_history')||'[]')}))}catch(e){FamilyMigration.accept('{}')}</script></body></html>""", "text/html", "utf-8", null)
         web.postDelayed({ old.removeJavascriptInterface("FamilyMigration"); old.destroy() }, 3000)
     }
-    override fun onBackPressed() { web.evaluateJavascript("window.FamilyBack && window.FamilyBack()", null) }
+    override fun onBackPressed() { if (!uiReady) Bridge().confirmExit() else web.evaluateJavascript("window.FamilyBack && window.FamilyBack()", null) }
     override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent): Boolean {
         if (keyCode in listOf(android.view.KeyEvent.KEYCODE_SEARCH, android.view.KeyEvent.KEYCODE_VOICE_ASSIST, android.view.KeyEvent.KEYCODE_ASSIST)) { Bridge().voiceSearch(); return true }
         return super.onKeyDown(keyCode, event)

@@ -105,10 +105,13 @@ object FamilySupport {
             handler.post {
                 if (activity.isFinishing) return@post
                 val box = LinearLayout(activity); box.orientation = LinearLayout.VERTICAL; box.setPadding(32, 20, 32, 20)
-                val text = TextView(activity); text.text = "$displayCode\n${version()}\n$displayStatus\n${clean(reason).take(250)}"; text.textSize = 18f; text.setTextColor(Color.WHITE)
+                val codeView = TextView(activity); codeView.text = displayCode; codeView.textSize = 42f; codeView.setTextColor(0xffffb703.toInt()); codeView.gravity = android.view.Gravity.CENTER
+                val text = TextView(activity); text.text = "${version()}\n$displayStatus\n${clean(reason).take(250)}"; text.textSize = 14f; text.setTextColor(Color.WHITE)
                 val image = ImageView(activity); image.setImageBitmap(bitmap); image.adjustViewBounds = true
-                box.addView(text); box.addView(image, LinearLayout.LayoutParams(280, 280))
-                AlertDialog.Builder(activity).setTitle("Логи / Диагностика").setView(box)
+                val qrSize = (200 * activity.resources.displayMetrics.density).toInt().coerceAtMost((activity.resources.displayMetrics.widthPixels * .65).toInt())
+                box.addView(codeView); box.addView(text); box.addView(image, LinearLayout.LayoutParams(qrSize, qrSize).apply { gravity = android.view.Gravity.CENTER_HORIZONTAL })
+                val scroll = android.widget.ScrollView(activity); scroll.addView(box)
+                AlertDialog.Builder(activity).setTitle("Логи / Диагностика").setView(scroll)
                     .setPositiveButton("Скопировать лог") { _, _ ->
                         (activity.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("Family Cinema $displayCode", report.toString(2)))
                         Toast.makeText(activity, "Лог скопирован", Toast.LENGTH_SHORT).show()
