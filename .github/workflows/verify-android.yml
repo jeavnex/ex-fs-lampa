@@ -1,4 +1,5 @@
-name: Verify Android touch, clipboard and playback
+name: Android verification
+run-name: Android verification (${{ inputs.suite }})
 on:
   workflow_dispatch:
     inputs:
@@ -25,6 +26,7 @@ jobs:
           }
           JS
   android:
+    name: Android ${{ inputs.suite }} checks
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
