@@ -44,7 +44,7 @@ class FamilyDeviceTest {
             scenario.onActivity { activity = it; web = findWeb(it.window.decorView) }
             val page = web!!
             try {
-                waitFor { ((js(page, "document.querySelectorAll('.card').length") as? Number)?.toInt() ?: 0) > 5 }
+                waitFor { js(page, "!document.getElementById('splash') && document.querySelectorAll('.card').length>5 && Array.from(document.querySelectorAll('.card img')).slice(0,2).every(img=>img.complete)") == true }
             } catch (error: Exception) {
                 val report=FamilySupport.report(instrumentation.targetContext,"UI initial load failed").put("dom",js(page,"document.body.innerText")).put("user_agent",js(page,"navigator.userAgent"))
                 File(instrumentation.targetContext.filesDir,"ui-report.json").writeText(report.toString(2))

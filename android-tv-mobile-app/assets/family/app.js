@@ -5,7 +5,7 @@
   const native = window.Family;
   const main = document.getElementById('main');
   const routes = [], pending = new Map();
-  let serial = 0, generation = 0, current = { name: 'home' }, filters = null;
+  let serial = 0, generation = 0, current = { name: 'home' }, filters = null, renderLibrary = [];
   const menu = [['home','Главная'],['movies','Фильмы'],['series','Сериалы'],['cartoons','Мультфильмы'],['shows','Передачи и шоу'],['search','Поиск'],['continue','Продолжить'],['favorites','Избранное'],['history','История']];
   const labels = Object.fromEntries(menu);
   const el = (tag, text, cls) => { const e=document.createElement(tag); if(text!==undefined)e.textContent=text; if(cls)e.className=cls; return e; };
@@ -19,11 +19,11 @@
   window.FamilyBack=()=>{if(routes.length){current=routes.pop();render(true);}else if(current.name!=='home'){current={name:'home'};render();}else native.confirmExit();};
   function library(){try{return JSON.parse(native.library());}catch{return [];}}
   function open(route){routes.push({...current,scroll:main.scrollTop,focus:document.activeElement?.dataset?.path});current=route;render();}
-  function card(item){const b=button('',()=>open({name:'item',item}),'card');b.dataset.path=item.path;const art=el('div',undefined,'art');const img=el('img');img.src=item.poster||'logo.svg';img.alt='';img.loading='lazy';img.onerror=()=>{img.onerror=null;img.src='logo.svg';};art.append(img);if(item.year)art.append(el('span',item.year,'badge'));const state=library().find(x=>x.path===item.path);if(state?.seconds>0&&state?.duration>0){const progress=el('progress');progress.className='resume';progress.max=state.duration;progress.value=state.seconds;art.append(progress);}b.append(art,el('strong',item.title),el('small',item.quality||item.original_title||''));return b;}
+  function card(item){const b=button('',()=>open({name:'item',item}),'card');b.dataset.path=item.path;const art=el('div',undefined,'art');const img=el('img');img.src=item.poster||'logo.svg';img.alt='';img.loading='lazy';img.onerror=()=>{img.onerror=null;img.src='logo.svg';};art.append(img);if(item.year)art.append(el('span',item.year,'badge'));const state=renderLibrary.find(x=>x.path===item.path);if(state?.seconds>0&&state?.duration>0){const progress=el('progress');progress.className='resume';progress.max=state.duration;progress.value=state.seconds;art.append(progress);}b.append(art,el('strong',item.title),el('small',item.quality||item.original_title||''));return b;}
   function cards(items,row=false){const grid=el('div',undefined,row?'row':'grid');items.forEach(item=>grid.append(card(item)));return grid;}
   function section(title,items){if(!items.length)return;main.append(el('h2',title),cards(items,true));}
-  function localList(kind){return library().filter(x=>kind==='favorites'?x.favorite:kind==='continue'?x.seconds>10&&(!x.duration||x.seconds<x.duration-30):(x.last_played||x.last_opened)).sort((a,b)=>(b.last_played||b.saved_at||0)-(a.last_played||a.saved_at||0));}
-  async function render(restore=false){const mine=++generation;const route=current;main.replaceChildren(el('p','Загружаем…','status'));main.scrollTop=0;document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.route===route.name));
+  function localList(kind){return renderLibrary.filter(x=>kind==='favorites'?x.favorite:kind==='continue'?x.seconds>10&&(!x.duration||x.seconds<x.duration-30):(x.last_played||x.last_opened)).sort((a,b)=>(b.last_played||b.saved_at||0)-(a.last_played||a.saved_at||0));}
+  async function render(restore=false){renderLibrary=library();const mine=++generation;const route=current;main.replaceChildren(el('p','Загружаем…','status'));main.scrollTop=0;document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.route===route.name));
     try{
       if(route.name==='home'){
         const data=await api('/api/home');if(mine!==generation)return;main.replaceChildren();const hero=el('div',undefined,'intro');hero.append(el('span','ВЕЧЕР В ХОРОШЕЙ КОМПАНИИ','eyebrow'),el('h1','Ваш домашний кинозал'),el('p','Любимые истории. Тёплый свет. Всё для уютного вечера.'));main.append(hero);section('Продолжить просмотр',localList('continue'));data.sections.forEach(s=>section(s.title,s.items));if(data.warning)toast(data.warning);

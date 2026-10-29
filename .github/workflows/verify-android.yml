@@ -1,6 +1,12 @@
 name: Verify Android touch, clipboard and playback
 on:
   workflow_dispatch:
+    inputs:
+      suite:
+        description: 'all = UI and live playback; ui = touch, remote, Back and clipboard'
+        type: choice
+        options: [all, ui]
+        default: all
 permissions:
   contents: read
 jobs:
@@ -43,6 +49,8 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - uses: reactivecircus/android-emulator-runner@v2
+        env:
+          FAMILY_TEST_SUITE: ${{ inputs.suite }}
         with:
           api-level: 35
           target: google_apis
