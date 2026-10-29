@@ -61,8 +61,9 @@ class FamilyPlayerActivity : Activity() {
         catch (_: Exception) { finish(); return }
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val container = LinearLayout(this); container.orientation = LinearLayout.VERTICAL; container.setBackgroundColor(Color.BLACK)
-        val toolbar = LinearLayout(this); toolbar.setPadding(6, 3, 6, 3); toolbar.setBackgroundColor(0xff16181f.toInt())
-        fun control(label: String, action: () -> Unit) { val b = Button(this); b.text = label; b.textSize = 12f; b.setTextColor(0xffffb703.toInt()); b.setOnClickListener { action() }; toolbar.addView(b, LinearLayout.LayoutParams(0, 52, 1f)) }
+        fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
+        val toolbar = LinearLayout(this); toolbar.setPadding(dp(6), dp(3), dp(6), dp(3)); toolbar.setBackgroundColor(0xff16181f.toInt())
+        fun control(label: String, action: () -> Unit) { val b = Button(this); b.text = label; b.textSize = 12f; b.setTextColor(0xffffb703.toInt()); b.setOnClickListener { action() }; toolbar.addView(b, LinearLayout.LayoutParams(0, dp(48), 1f)) }
         control("‹ Назад") { close() }; control("−10 с") { command("left") }; control("▶ / Ⅱ") { command("toggle") }; control("+10 с") { command("right") }; control("Плеер") { choosePlayer() }; control("Логи") { FamilySupport.diagnostics(this, "Плеер: ${item.optString("path")}") }
         status = TextView(this); status.setTextColor(0xffc5c6ce.toInt()); status.textSize = 11f; status.setPadding(12, 2, 12, 4)
         frame = FrameLayout(this)
