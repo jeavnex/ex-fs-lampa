@@ -36,6 +36,7 @@ class FamilyPlayerActivity : Activity() {
     private var duration = 0.0
     private var season = ""
     private var episode = ""
+    private var episodeId = ""
     private var previousMediaTime = -1.0
     private var lastSaved = 0L
     private var lastProgress = 0L
@@ -70,6 +71,7 @@ class FamilyPlayerActivity : Activity() {
         container.addView(toolbar); container.addView(status); container.addView(frame, LinearLayout.LayoutParams(-1, 0, 1f)); setContentView(container)
         val saved = FamilySupport.saved(this, item.optString("path"))
         seconds = saved.optDouble("seconds", 0.0); duration = saved.optDouble("duration", 0.0); season = saved.optString("season"); episode = saved.optString("episode")
+        episodeId = saved.optString("episode_id")
         select(index); FamilySupport.handler.postDelayed(watchdog, 1000)
     }
     private fun blocked(host: String) = ads.any { host == it || host.endsWith(".$it") }
@@ -92,7 +94,7 @@ class FamilyPlayerActivity : Activity() {
         web.settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
         CookieManager.getInstance().setAcceptThirdPartyCookies(web, true)
         val agent = assets.open("family/player-agent.js").bufferedReader().use { it.readText() }
-        val restore = JSONObject().put("seconds", seconds).put("season", season).put("episode", episode)
+        val restore = JSONObject().put("seconds", seconds).put("season", season).put("episode", episode).put("episode_id", episodeId)
         val script = "window.familyRestore=$restore;\n$agent"
         val early = WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT) && WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)
         if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
@@ -171,17 +173,18 @@ class FamilyPlayerActivity : Activity() {
                     seconds = time; duration = length
                     if (data.optString("season").isNotBlank()) season = data.optString("season").take(40)
                     if (data.optString("episode").isNotBlank()) episode = data.optString("episode").take(40)
+                    if (data.optString("episode_id").isNotBlank()) episodeId = data.optString("episode_id").take(100)
                     if (SystemClock.elapsedRealtime() - lastSaved > 5000) save()
                 }
             }
             "error" -> fallback("Ошибка видеопотока ${data.optString("code")}")
-            "selection" -> { season = data.optString("season").take(40); episode = data.optString("episode").take(40); seconds = 0.0; duration = 0.0; previousMediaTime = -1.0; save() }
+            "selection" -> { season = data.optString("season").take(40); episode = data.optString("episode").take(40); episodeId = data.optString("episode_id").take(100); seconds = 0.0; duration = 0.0; previousMediaTime = -1.0; save() }
         }
     }
     private fun save() {
         if (!confirmed && seconds <= 0) return
         lastSaved = SystemClock.elapsedRealtime()
-        FamilySupport.merge(this, item) { it.put("seconds", seconds).put("duration", duration).put("season", season).put("episode", episode).put("player", index).put("last_played", System.currentTimeMillis()) }
+        FamilySupport.merge(this, item) { it.put("seconds", seconds).put("duration", duration).put("season", season).put("episode", episode).put("episode_id", episodeId).put("player", index).put("last_played", System.currentTimeMillis()) }
     }
     private fun fallback(reason: String) {
         if (isFinishing || failed || !active) return

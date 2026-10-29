@@ -1,6 +1,7 @@
 /* All privileged actions stay in the native bridge of the local APK page. */
 (() => {
   'use strict';
+  if(!Element.prototype.replaceChildren)Element.prototype.replaceChildren=function(...nodes){while(this.firstChild)this.removeChild(this.firstChild);this.append(...nodes);};
   const native = window.Family;
   const main = document.getElementById('main');
   const routes = [], pending = new Map();
