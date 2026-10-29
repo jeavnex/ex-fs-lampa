@@ -32,6 +32,9 @@ class FamilyActivity : Activity() {
         web.settings.javaScriptEnabled = true; web.settings.domStorageEnabled = true
         web.settings.allowFileAccess = false; web.settings.allowContentAccess = false
         web.settings.javaScriptCanOpenWindowsAutomatically = false
+        web.webChromeClient = object : WebChromeClient() {
+            override fun onConsoleMessage(message: ConsoleMessage): Boolean { FamilySupport.log("Local UI ${message.messageLevel()}: ${message.message()}"); return true }
+        }
         web.addJavascriptInterface(Bridge(), "Family")
         val loader = WebViewAssetLoader.Builder().addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this)).build()
         web.webViewClient = object : WebViewClient() {
@@ -46,6 +49,7 @@ class FamilyActivity : Activity() {
             override fun onPageFinished(view: WebView, url: String) { FamilySupport.log("Local UI loaded ${FamilySupport.version()}") }
         }
         web.loadUrl("https://appassets.androidplatform.net/assets/family/index.html")
+        migrateLegacyFavorites()
         web.postDelayed({ checkUpdate(false) }, 3500)
     }
     inner class Bridge {
@@ -81,6 +85,37 @@ class FamilyActivity : Activity() {
         @JavascriptInterface fun confirmExit() { runOnUiThread { AlertDialog.Builder(this@FamilyActivity).setMessage("Выйти из приложения?").setPositiveButton("Выйти") { _, _ -> finish() }.setNegativeButton("Остаться", null).show() } }
     }
     private fun toast(message: String) = Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun migrateLegacyFavorites() {
+        val prefs = FamilySupport.prefs(this)
+        if (prefs.getBoolean("legacy_imported", false)) return
+        val old = WebView(this)
+        old.settings.javaScriptEnabled = true; old.settings.domStorageEnabled = true
+        old.settings.blockNetworkLoads = true; old.settings.allowFileAccess = false
+        old.addJavascriptInterface(object {
+            @JavascriptInterface fun accept(value: String) {
+                if (value.length > 500000) return
+                try {
+                    val data = JSONObject(value)
+                    for (key in listOf("favorites", "history")) {
+                        val rows = data.optJSONArray(key) ?: continue
+                        for (i in 0 until minOf(rows.length(), 350)) {
+                            val row = rows.optJSONObject(i) ?: continue
+                            if (!row.optString("path").matches(Regex("/(film|serials|multfilm|tv-show)/[0-9]+-[a-zA-Z0-9_-]+\\.html"))) continue
+                            FamilySupport.merge(this@FamilyActivity, row) {
+                                if (key == "favorites") it.put("favorite", true)
+                                else it.put("last_opened", System.currentTimeMillis() - i * 1000)
+                            }
+                        }
+                    }
+                    prefs.edit().putBoolean("legacy_imported", true).apply()
+                    FamilySupport.log("Imported legacy local favorites/history without loading the old website")
+                } catch (e: Exception) { FamilySupport.log("Legacy import: ${e.javaClass.simpleName}") }
+            }
+        }, "FamilyMigration")
+        old.loadDataWithBaseURL("https://jeavnex.github.io/ex-fs-lampa/lampa/", """<html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'"></head><body><script>try{FamilyMigration.accept(JSON.stringify({favorites:JSON.parse(localStorage.getItem('family_favorites')||'[]'),history:JSON.parse(localStorage.getItem('family_history')||'[]')}))}catch(e){FamilyMigration.accept('{}')}</script></body></html>""", "text/html", "utf-8", null)
+        web.postDelayed({ old.removeJavascriptInterface("FamilyMigration"); old.destroy() }, 3000)
+    }
     override fun onBackPressed() { web.evaluateJavascript("window.FamilyBack && window.FamilyBack()", null) }
     override fun onResume() { super.onResume(); if (::web.isInitialized) { web.onResume(); web.evaluateJavascript("window.FamilyReturned && window.FamilyReturned()", null) } }
     override fun onPause() { web.onPause(); super.onPause() }

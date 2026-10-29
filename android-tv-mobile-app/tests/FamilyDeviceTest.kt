@@ -43,7 +43,15 @@ class FamilyDeviceTest {
             var web: WebView? = null; var activity: FamilyActivity? = null
             scenario.onActivity { activity = it; web = findWeb(it.window.decorView) }
             val page = web!!
-            waitFor { ((js(page, "document.querySelectorAll('.card').length") as? Number)?.toInt() ?: 0) > 5 }
+            try {
+                waitFor { ((js(page, "document.querySelectorAll('.card').length") as? Number)?.toInt() ?: 0) > 5 }
+            } catch (error: Exception) {
+                val report=FamilySupport.report(instrumentation.targetContext,"UI initial load failed").put("dom",js(page,"document.body.innerText")).put("user_agent",js(page,"navigator.userAgent"))
+                File(instrumentation.targetContext.filesDir,"ui-report.json").writeText(report.toString(2))
+                val screenshot=instrumentation.uiAutomation.takeScreenshot()
+                File(instrumentation.targetContext.filesDir,"android-ui.png").outputStream().use { screenshot.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it) }
+                throw error
+            }
             js(page,"document.getElementById('main').scrollTop=0;document.activeElement.blur();true")
             val before = (js(page,"document.getElementById('main').scrollTop") as Number).toInt()
             val start = SystemClock.uptimeMillis()
@@ -72,11 +80,12 @@ class FamilyDeviceTest {
             waitFor { js(page,"document.querySelector('main h1')?.textContent") == "Фильмы" }
             js(page,"document.querySelector('[data-route=home]').click();true")
             waitFor { js(page,"document.querySelectorAll('.card').length") is Number }
+            Thread.sleep(1000)
+            val screenshot = instrumentation.uiAutomation.takeScreenshot()
+            File(instrumentation.targetContext.filesDir,"android-ui.png").outputStream().use { screenshot.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it) }
             instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
             Thread.sleep(400)
             assertFalse(activity!!.isFinishing)
-            val screenshot = instrumentation.uiAutomation.takeScreenshot()
-            File(instrumentation.targetContext.filesDir,"android-ui.png").outputStream().use { screenshot.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it) }
             instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
         }
     }
@@ -90,7 +99,7 @@ class FamilyDeviceTest {
         val intent = Intent(context,FamilyPlayerActivity::class.java).putExtra("item",item.toString()).putExtra("index",0).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         try {
             ActivityScenario.launch<FamilyPlayerActivity>(intent).use {
-                waitFor(130000) { FamilySupport.saved(context,item.getString("path")).optDouble("seconds",0.0)>3 }
+                waitFor(130000) { val state=FamilySupport.saved(context,item.getString("path")); state.optDouble("seconds",0.0)>3 && state.optDouble("duration",0.0)>600 }
                 val saved = FamilySupport.saved(context,item.getString("path"))
                 assertTrue("Video clock must advance; loading an iframe is insufficient",saved.optDouble("seconds")>3)
             }
