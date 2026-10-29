@@ -2,7 +2,7 @@ name: Check Family Cinema
 on:
   push:
     branches: [main]
-    paths: ['backend-cf/**', 'plugin-web/**', '.github/workflows/check.yml']
+    paths: ['backend-cf/**', 'android-tv-mobile-app/**', '.github/workflows/check.yml']
   pull_request:
 permissions:
   contents: read
@@ -19,4 +19,4 @@ jobs:
         working-directory: backend-cf
       - run: npm test
         working-directory: backend-cf
-      - run: node --check plugin-web/family_exfs_plugin.js
+      - run: node --check android-tv-mobile-app/assets/family/app.js && node --check android-tv-mobile-app/assets/family/player-agent.js

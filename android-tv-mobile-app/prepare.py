@@ -1,5 +1,8 @@
-"""Prepare the pinned original LAMPA with the complete Family Cinema overlay."""
+"""Reproducible local-only Family UI using the pinned LAMPA Android build base."""
 from pathlib import Path
+from datetime import datetime, timezone
+import json
+import os
 import shutil
 import subprocess
 import sys
@@ -7,7 +10,7 @@ import sys
 UPSTREAM_COMMIT = '28d7616f52d969abd6a93d8692b15a8525b36efc'
 ROOT = Path(__file__).resolve().parent
 SOURCE = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else ROOT / 'upstream'
-DEST = ROOT / 'generated'
+DEST = Path(os.environ.get('FAMILY_BUILD_DIR', str(ROOT / 'generated'))).resolve()
 if not SOURCE.exists():
     subprocess.run(['git', 'clone', 'https://github.com/lampa-app/LAMPA.git', str(SOURCE)], check=True)
     subprocess.run(['git', '-C', str(SOURCE), 'checkout', UPSTREAM_COMMIT], check=True)
@@ -15,52 +18,42 @@ head = subprocess.check_output(['git', '-C', str(SOURCE), 'rev-parse', 'HEAD'], 
 if head != UPSTREAM_COMMIT:
     raise SystemExit('Wrong upstream revision: ' + head)
 if DEST.exists():
-    raise SystemExit('generated/ already exists. Use a fresh build directory.')
-shutil.copytree(SOURCE, DEST, ignore=shutil.ignore_patterns('.git', '.github', '.idea', '.gradle', 'build', 'local.properties'))
-
-def replace(path, before, after, count=1):
-    file = DEST / path
-    text = file.read_text(encoding='utf-8')
-    found = text.count(before)
-    if found != count:
-        raise SystemExit(f'Patch mismatch in {path}: expected {count}, got {found}')
-    file.write_text(text.replace(before, after), encoding='utf-8')
-
-replace('app/build.gradle', 'applicationId "top.rootu.lampa"', 'applicationId "io.github.jeavnex.familycinema"')
-replace('app/build.gradle', 'versionCode getVersionCode()', 'versionCode = Integer.parseInt(System.getenv("GITHUB_RUN_NUMBER") ?: "1")')
-replace('app/build.gradle', 'versionName getVersionName()', 'versionName "1.0.${System.getenv("GITHUB_RUN_NUMBER") ?: "0"}"')
-replace('app/build.gradle', '"enableUpdate", "true"', '"enableUpdate", "false"')
-replace('app/build.gradle', '"defaultAppUrl", "\\"\\""', '"defaultAppUrl", "\\"https://jeavnex.github.io/ex-fs-lampa/lampa/\\""', count=2)
-replace('app/src/main/res/values/strings.xml', '>LAMPA</string>', '>Family Cinema</string>')
-replace('app/src/main/AndroidManifest.xml', 'android:screenOrientation="userLandscape"', 'android:screenOrientation="unspecified"')
-replace('app/src/main/AndroidManifest.xml', '<activity\n            android:name=".CrashActivity"', '<activity android:name=".FamilyPlayerActivity" android:exported="false" android:configChanges="keyboard|keyboardHidden|orientation|screenSize" />\n        <activity\n            android:name=".CrashActivity"')
-marker = '        Log.d(TAG, "LAMPA onLoadFinished $url")'
-injection = '''        val familyUri = Uri.parse(url)
-        if (familyUri.scheme == "https" && familyUri.host == "jeavnex.github.io"
-            && familyUri.path?.trimEnd('/') == "/ex-fs-lampa/lampa") {
-            val familyScript = assets.open("family_exfs_plugin.js").bufferedReader().use { it.readText() }
-            browser?.evaluateJavascript("window.FAMILY_CINEMA_AUTO_START=true;\\n" + familyScript) { result ->
-                Log.d(TAG, "Family Cinema plugin loaded")
-            }
-        }
-'''
-replace('app/src/main/java/top/rootu/lampa/MainActivity.kt', marker, injection + marker)
-bridge = '''    @JavascriptInterface
-    @org.xwalk.core.JavascriptInterface
-    fun openFamilyPlayer(url: String) {
-        val parsed = android.net.Uri.parse(url)
-        if (parsed.scheme != "https" || parsed.host.isNullOrEmpty() || parsed.userInfo != null) return
-        mainActivity.runOnUiThread {
-            val intent = Intent(mainActivity, FamilyPlayerActivity::class.java)
-            intent.putExtra("player_url", url)
-            mainActivity.startActivity(intent)
-        }
-    }
-
-'''
-# Insert before the annotations of openBrowser to keep both methods annotated.
-replace('app/src/main/java/top/rootu/lampa/AndroidJS.kt', '    @JavascriptInterface\n    @org.xwalk.core.JavascriptInterface\n    fun openBrowser', bridge + '    @JavascriptInterface\n    @org.xwalk.core.JavascriptInterface\n    fun openBrowser')
-shutil.copy2(ROOT / 'overlay/FamilyPlayerActivity.kt', DEST / 'app/src/main/java/top/rootu/lampa/FamilyPlayerActivity.kt')
-shutil.copy2(ROOT.parent / 'plugin-web/family_exfs_plugin.js', DEST / 'app/src/main/assets/family_exfs_plugin.js')
-(DEST / 'FAMILY_UPSTREAM.txt').write_text('https://github.com/lampa-app/LAMPA/tree/' + UPSTREAM_COMMIT + '\n', encoding='utf-8')
-print('Family Cinema Android sources prepared:', DEST)
+    raise SystemExit('Build folder already exists; choose a fresh FAMILY_BUILD_DIR.')
+key = os.environ.get('FAMILY_APP_KEY', '')
+if len(key) < 32 or not all(c.isalnum() or c in '_-' for c in key):
+    raise SystemExit('FAMILY_APP_KEY must be configured in the private build environment.')
+DEST.mkdir(parents=True)
+for name in ['gradlew', 'gradlew.bat', 'gradle.properties', 'build.gradle', 'settings.gradle']:
+    shutil.copy2(SOURCE / name, DEST / name)
+shutil.copytree(SOURCE / 'gradle', DEST / 'gradle')
+code = 100000 + int(os.environ.get('GITHUB_RUN_NUMBER', '1')) * 100 + int(os.environ.get('GITHUB_RUN_ATTEMPT', '1'))
+version = f'2.0.{code}'
+date = datetime.now(timezone.utc)
+build_date = date.strftime('%d.%m.%Y')
+app = DEST / 'app'
+src = app / 'src/main'
+(src / 'java/top/rootu/lampa').mkdir(parents=True)
+shutil.copytree(ROOT / 'assets', src / 'assets')
+shutil.copytree(ROOT / 'res', src / 'res')
+for file in (ROOT / 'overlay').glob('*.kt'):
+    shutil.copy2(file, src / 'java/top/rootu/lampa' / file.name)
+tests = app / 'src/androidTest/java/top/rootu/lampa'
+tests.mkdir(parents=True)
+for file in (ROOT / 'tests').glob('*.kt'):
+    shutil.copy2(file, tests / file.name)
+shutil.copy2(ROOT / 'AndroidManifest.xml', src / 'AndroidManifest.xml')
+gradle = (ROOT / 'family-app.gradle').read_text(encoding='utf-8')
+gradle = gradle.replace('@VERSION_CODE@', str(code)).replace('@VERSION_NAME@', version)
+gradle = gradle.replace('@APP_KEY@', json.dumps(json.dumps(key))).replace('@BUILD_DATE@', json.dumps(json.dumps(build_date)))
+(app / 'build.gradle').write_text(gradle, encoding='utf-8')
+(app / 'proguard-rules.pro').write_text('-keepclassmembers class * { @android.webkit.JavascriptInterface <methods>; }\n', encoding='utf-8')
+metadata = {'version_code':code, 'version_name':version, 'built_at':date.isoformat()}
+(DEST / 'version.json').write_text(json.dumps(metadata), encoding='utf-8')
+# Include corresponding project source in the distributed APK, excluding generated secrets and backups.
+import tarfile
+with tarfile.open(src / 'assets/family-sources.tar.gz', 'w:gz') as archive:
+    for file in ROOT.rglob('*'):
+        if file.is_file() and not any(part in {'generated','upstream','__pycache__'} for part in file.relative_to(ROOT).parts):
+            archive.add(file, arcname='android-tv-mobile-app/' + file.relative_to(ROOT).as_posix())
+(DEST / 'FAMILY_UPSTREAM.txt').write_text('Android build base: https://github.com/lampa-app/LAMPA/tree/' + UPSTREAM_COMMIT + '\nOnly FamilyActivity is launched; no Lampa web client is shipped.\n', encoding='utf-8')
+print('Prepared', version, 'at', DEST)

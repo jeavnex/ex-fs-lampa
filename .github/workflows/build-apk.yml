@@ -3,19 +3,19 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['android-tv-mobile-app/**', 'plugin-web/family_exfs_plugin.js', '.github/workflows/build-apk.yml']
+    paths: ['android-tv-mobile-app/**', 'scripts/publish-apk.py', '.github/workflows/build-apk.yml']
 permissions:
-  contents: read
+  contents: write
 concurrency:
-  group: family-apk-${{ github.ref }}
-  cancel-in-progress: true
+  group: family-apk
+  cancel-in-progress: false
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
-      - name: Load pinned original LAMPA
+      - name: Load pinned Android build base
         uses: actions/checkout@v7
         with:
           repository: lampa-app/LAMPA
@@ -26,13 +26,13 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Prepare complete Family Cinema sources
+      - name: Prepare local Family interface
+        env:
+          FAMILY_APP_KEY: ${{ secrets.FAMILY_APP_KEY }}
         run: python3 android-tv-mobile-app/prepare.py "$GITHUB_WORKSPACE/.build/lampa-upstream"
-      - name: Set up Android command-line tools
-        uses: android-actions/setup-android@v4
-      - name: Install Android SDK components
-        run: sdkmanager 'platforms;android-34' 'build-tools;34.0.0'
-      - name: Build signed APK
+      - uses: android-actions/setup-android@v4
+      - run: sdkmanager 'platforms;android-34' 'build-tools;34.0.0'
+      - name: Build with the permanent signing key
         working-directory: android-tv-mobile-app/generated
         env:
           KEYSTORE_BASE64: ${{ secrets.FAMILY_KEYSTORE_BASE64 }}
@@ -40,21 +40,29 @@ jobs:
           RELEASE_SIGN_KEY_ALIAS: ${{ secrets.FAMILY_KEY_ALIAS }}
           RELEASE_SIGN_KEY_PASSWORD: ${{ secrets.FAMILY_KEY_PASSWORD }}
         run: |
+          set -eu
+          test -n "$KEYSTORE_BASE64" && test -n "$KEYSTORE_PASSWORD" && test -n "$RELEASE_SIGN_KEY_ALIAS" && test -n "$RELEASE_SIGN_KEY_PASSWORD"
+          export KEYSTORE_FILE="$RUNNER_TEMP/family-release.jks"
+          trap 'rm -f "$KEYSTORE_FILE"' EXIT
+          python3 -c 'import os,base64,pathlib; p=pathlib.Path(os.environ["KEYSTORE_FILE"]); p.write_bytes(base64.b64decode(os.environ["KEYSTORE_BASE64"])); p.chmod(0o600)'
           chmod +x gradlew
+          ./gradlew --no-daemon assembleRelease lintRelease --stacktrace
           mkdir -p "$GITHUB_WORKSPACE/apk-output"
-          if [ -n "$KEYSTORE_BASE64" ]; then
-            export KEYSTORE_FILE="$RUNNER_TEMP/family-release.jks"
-            python3 -c 'import os,base64,pathlib; p=pathlib.Path(os.environ["KEYSTORE_FILE"]); p.write_bytes(base64.b64decode(os.environ["KEYSTORE_BASE64"])); p.chmod(0o600)'
-            ./gradlew --no-daemon assembleLiteRelease --stacktrace
-            cp app/build/outputs/apk/lite/release/app-lite-release.apk "$GITHUB_WORKSPACE/apk-output/FamilyCinema.apk"
-            rm -f "$KEYSTORE_FILE"
-            echo 'Постоянная подпись: APK можно устанавливать поверх предыдущей сборки с тем же ключом.' >> "$GITHUB_STEP_SUMMARY"
-          else
-            ./gradlew --no-daemon assembleLiteDebug --stacktrace
-            cp app/build/outputs/apk/lite/debug/app-lite-debug.apk "$GITHUB_WORKSPACE/apk-output/FamilyCinema.apk"
-            echo 'Личная тестовая сборка с отладочной подписью. При другой подписи Android потребует удалить старое приложение; локальные данные удалятся.' >> "$GITHUB_STEP_SUMMARY"
-          fi
-          sha256sum "$GITHUB_WORKSPACE/apk-output/FamilyCinema.apk" > "$GITHUB_WORKSPACE/apk-output/SHA256SUMS.txt"
+          cp app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/apk-output/FamilyCinema.apk"
+          cp version.json "$GITHUB_WORKSPACE/apk-output/version.json"
+      - name: Prepare checksum and publish the single latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 scripts/publish-apk.py metadata apk-output
+          gh release view latest >/dev/null 2>&1 || gh release create latest --target "$GITHUB_SHA" --title 'Домашнее кино — актуальная сборка' --notes 'Постоянный файл FamilyCinema.apk. Устанавливается поверх прежней версии с тем же ключом подписи.'
+          gh release upload latest apk-output/FamilyCinema.apk apk-output/version.json apk-output/SHA256SUMS.txt --clobber
+          gh release edit latest --target "$GITHUB_SHA" --latest
+          gh api --method PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/latest" -f sha="$GITHUB_SHA" -F force=true
+      - name: Publish APK to Family Cinema D1 storage
+        env:
+          FAMILY_RELEASE_KEY: ${{ secrets.FAMILY_RELEASE_KEY }}
+        run: python3 scripts/publish-apk.py upload apk-output
       - uses: actions/upload-artifact@v7
         with:
           name: FamilyCinema

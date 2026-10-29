@@ -14,3 +14,4 @@ android-tv-mobile-app/upstream/
 __pycache__/
 .build/
 .pages/
+/BACKUP_KEYSTORE_DO_NOT_LOSE/

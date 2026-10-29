@@ -5,6 +5,9 @@ account_id = "78b2e8eb9b4aa24ca9f8e6c6ae79c9d3"
 workers_dev = true
 preview_urls = false
 
+[triggers]
+crons = ["17 4 * * *"]
+
 [[d1_databases]]
 binding = "FAMILY_DB"
 database_name = "family_cinema_db"

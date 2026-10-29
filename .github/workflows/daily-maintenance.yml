@@ -1,0 +1,23 @@
+name: Daily EX-FS source check
+on:
+  schedule:
+    - cron: '47 5 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Verify source, search and cached players
+        env:
+          FAMILY_MAINTENANCE_KEY: ${{ secrets.FAMILY_MAINTENANCE_KEY }}
+        run: |
+          python3 - <<'PY'
+          import os, urllib.request, json
+          request=urllib.request.Request('https://family-cinema-api.pvde.workers.dev/api/maintenance',data=b'{}',method='POST',headers={'X-Family-Maintenance-Key':os.environ['FAMILY_MAINTENANCE_KEY']})
+          with urllib.request.urlopen(request,timeout=90) as response: report=json.load(response)
+          print(json.dumps(report,ensure_ascii=False))
+          if not report.get('ok'):raise SystemExit('Source maintenance failed; see maintenance_runs in family_cinema_db')
+          PY

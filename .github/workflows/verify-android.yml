@@ -1,0 +1,52 @@
+name: Verify Android touch, clipboard and playback
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7
+        with:
+          repository: lampa-app/LAMPA
+          ref: 28d7616f52d969abd6a93d8692b15a8525b36efc
+          path: .build/lampa-upstream
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Prepare application and Android tests
+        env:
+          FAMILY_APP_KEY: ${{ secrets.FAMILY_APP_KEY }}
+        run: python3 android-tv-mobile-app/prepare.py "$GITHUB_WORKSPACE/.build/lampa-upstream"
+      - name: Enable KVM for the temporary test runner
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          script: cd android-tv-mobile-app/generated && chmod +x gradlew && ./gradlew --no-daemon connectedDebugAndroidTest --stacktrace
+      - name: Collect bounded diagnostic evidence
+        if: always()
+        run: |
+          mkdir -p android-evidence
+          adb exec-out run-as io.github.jeavnex.familycinema cat files/playback-report.json > android-evidence/playback-report.json || true
+          adb exec-out run-as io.github.jeavnex.familycinema cat files/android-ui.png > android-evidence/android-ui.png || true
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: Android-verification
+          path: |
+            android-evidence/
+            android-tv-mobile-app/generated/app/build/reports/androidTests/
+          retention-days: 1
