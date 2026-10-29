@@ -21,7 +21,7 @@
   function card(item){const b=button('',()=>open({name:'item',item}),'card');b.dataset.path=item.path;const art=el('div',undefined,'art');const img=el('img');img.src=item.poster||'logo.svg';img.alt='';img.loading='lazy';img.onerror=()=>{img.onerror=null;img.src='logo.svg';};art.append(img);if(item.year)art.append(el('span',item.year,'badge'));const state=library().find(x=>x.path===item.path);if(state?.seconds>0&&state?.duration>0){const progress=el('progress');progress.className='resume';progress.max=state.duration;progress.value=state.seconds;art.append(progress);}b.append(art,el('strong',item.title),el('small',item.quality||item.original_title||''));return b;}
   function cards(items,row=false){const grid=el('div',undefined,row?'row':'grid');items.forEach(item=>grid.append(card(item)));return grid;}
   function section(title,items){if(!items.length)return;main.append(el('h2',title),cards(items,true));}
-  function localList(kind){return library().filter(x=>kind==='favorites'?x.favorite:kind==='continue'?x.seconds>10&&(!x.duration||x.seconds<x.duration-30):x.last_played).sort((a,b)=>(b.last_played||b.saved_at||0)-(a.last_played||a.saved_at||0));}
+  function localList(kind){return library().filter(x=>kind==='favorites'?x.favorite:kind==='continue'?x.seconds>10&&(!x.duration||x.seconds<x.duration-30):(x.last_played||x.last_opened)).sort((a,b)=>(b.last_played||b.saved_at||0)-(a.last_played||a.saved_at||0));}
   async function render(restore=false){const mine=++generation;const route=current;main.replaceChildren(el('p','Загружаем…','status'));main.scrollTop=0;document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.route===route.name));
     try{
       if(route.name==='home'){
@@ -56,5 +56,5 @@
   menu.forEach(([key,title])=>{const b=button(title,()=>{routes.length=0;current={name:key};render();});b.dataset.route=key;document.getElementById('nav').append(b);});
   document.getElementById('back').onclick=window.FamilyBack;document.getElementById('settings').onclick=()=>open({name:'settings'});
   if(!native){main.replaceChildren(el('p','Этот интерфейс работает внутри приложения FamilyCinema.apk.'));document.getElementById('splash').remove();return;}
-  document.getElementById('version').textContent=native.version();render();
+  document.getElementById('version').textContent=native.version();native.ready();render();
 })();

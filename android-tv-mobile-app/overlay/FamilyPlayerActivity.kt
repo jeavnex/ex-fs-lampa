@@ -46,8 +46,8 @@ class FamilyPlayerActivity : Activity() {
     private var generation = 0
     private var restoreAfterPause = false
     private val players get() = item.getJSONArray("players")
-    private val hosts get() = (0 until players.length()).mapNotNull { Uri.parse(players.getJSONObject(it).optString("url")).host }.toSet()
-    private val ads = listOf("doubleclick.net", "googlesyndication.com", "googleadservices.com", "adsterra.com", "popads.net", "popcash.net", "onclicka.com", "onclickalgo.com", "realsrv.com", "exoclick.com", "betweendigital.com", "1xbet.com", "1x-bet.com", "melbet.com", "mostbet.com", "1win.com", "trafficjunky.net", "advmaker.net", "adskeeper.com", "criteo.com", "propellerads.com")
+    private val hosts get() = (0 until players.length()).mapNotNull { Uri.parse(players.getJSONObject(it).optString("url")).host }.toSet() + setOf("api.domem.ws")
+    private val ads = listOf("distribrey.com", "doubleclick.net", "googlesyndication.com", "googleadservices.com", "adsterra.com", "popads.net", "popcash.net", "onclicka.com", "onclickalgo.com", "realsrv.com", "exoclick.com", "betweendigital.com", "1xbet.com", "1x-bet.com", "melbet.com", "mostbet.com", "1win.com", "trafficjunky.net", "advmaker.net", "adskeeper.com", "criteo.com", "propellerads.com")
     private val watchdog = object : Runnable {
         override fun run() {
             if (isFinishing || !active) return
@@ -102,6 +102,13 @@ class FamilyPlayerActivity : Activity() {
                     try { val data = message.data ?: ""; if (data.length <= 2000) telemetry(JSONObject(data)) } catch (_: Exception) { }
                 }
             }
+        } else {
+            web.addJavascriptInterface(object {
+                @JavascriptInterface fun postMessage(data: String) {
+                    if (data.length > 2000) return
+                    runOnUiThread { if (mine == generation && !failed) try { telemetry(JSONObject(data)) } catch (_: Exception) { } }
+                }
+            }, "FamilyMedia")
         }
         if (early) WebViewCompat.addDocumentStartJavaScript(web, script, setOf("*"))
         else FamilySupport.log("Old WebView: update Android System WebView for frame telemetry")
@@ -125,6 +132,7 @@ class FamilyPlayerActivity : Activity() {
             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
                 val uri = request.url
                 if (uri.scheme in listOf("blob", "data")) return null
+                if (blocked(uri.host ?: "") && uri.path?.contains("xml") == true) return WebResourceResponse("application/xml", "utf-8", ByteArrayInputStream("<VAST version=\"3.0\"></VAST>".toByteArray()))
                 if (!permitted(uri)) return empty()
                 if (request.method != "GET") return null
                 return try {

@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['android-tv-mobile-app/**', 'scripts/publish-apk.py', '.github/workflows/build-apk.yml']
+    paths: ['android-tv-mobile-app/**', 'scripts/publish-apk.*', '.github/workflows/build-apk.yml']
 permissions:
   contents: write
 concurrency:
@@ -65,7 +65,7 @@ jobs:
       - name: Publish APK to Family Cinema D1 storage
         env:
           FAMILY_RELEASE_KEY: ${{ secrets.FAMILY_RELEASE_KEY }}
-        run: python3 scripts/publish-apk.py upload apk-output
+        run: node scripts/publish-apk.mjs apk-output
       - uses: actions/upload-artifact@v7
         with:
           name: FamilyCinema

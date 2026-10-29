@@ -14,10 +14,8 @@ jobs:
         env:
           FAMILY_MAINTENANCE_KEY: ${{ secrets.FAMILY_MAINTENANCE_KEY }}
         run: |
-          python3 - <<'PY'
-          import os, urllib.request, json
-          request=urllib.request.Request('https://family-cinema-api.pvde.workers.dev/api/maintenance',data=b'{}',method='POST',headers={'X-Family-Maintenance-Key':os.environ['FAMILY_MAINTENANCE_KEY']})
-          with urllib.request.urlopen(request,timeout=90) as response: report=json.load(response)
-          print(json.dumps(report,ensure_ascii=False))
-          if not report.get('ok'):raise SystemExit('Source maintenance failed; see maintenance_runs in family_cinema_db')
-          PY
+          node --input-type=module <<'JS'
+          const response=await fetch('https://family-cinema-api.pvde.workers.dev/api/maintenance',{method:'POST',headers:{'X-Family-Maintenance-Key':process.env.FAMILY_MAINTENANCE_KEY},signal:AbortSignal.timeout(90000)});
+          const report=await response.json(); console.log(report);
+          if(!response.ok||!report.ok)process.exit(1);
+          JS

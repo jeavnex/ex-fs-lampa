@@ -24,6 +24,7 @@ class FamilyActivity : Activity() {
     private lateinit var web: WebView
     private var updateBusy = false
     private var pendingApk: File? = null
+    private var uiReady = false
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
@@ -49,10 +50,13 @@ class FamilyActivity : Activity() {
             override fun onPageFinished(view: WebView, url: String) { FamilySupport.log("Local UI loaded ${FamilySupport.version()}") }
         }
         web.loadUrl("https://appassets.androidplatform.net/assets/family/index.html")
+        FamilySupport.log("WebView ${web.settings.userAgentString}")
+        web.postDelayed({ if (!uiReady && !isFinishing) AlertDialog.Builder(this).setTitle("Интерфейс не запустился").setMessage("Проверьте обновление Android System WebView. Технический отчёт можно открыть здесь.").setPositiveButton("Логи") { _, _ -> FamilySupport.diagnostics(this, "Local UI did not become ready") }.setNegativeButton("Закрыть", null).show() }, 15000)
         migrateLegacyFavorites()
         web.postDelayed({ checkUpdate(false) }, 3500)
     }
     inner class Bridge {
+        @JavascriptInterface fun ready() { uiReady = true }
         @JavascriptInterface fun version() = FamilySupport.version()
         @JavascriptInterface fun library() = FamilySupport.library(this@FamilyActivity).toString()
         @JavascriptInterface fun request(id: String, path: String, body: String) {
