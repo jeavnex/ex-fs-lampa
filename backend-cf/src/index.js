@@ -266,11 +266,19 @@ async function getConfig(env) {
   const row = await env.FAMILY_DB.prepare('SELECT payload FROM parser_config WHERE config_key=?').bind('verified').first();
   if (row) return JSON.parse(row.payload);
   const html = await fetchSource('/');
-  const discovered = await discover(html);
+  const discovered = await expandYearLinks(await discover(html));
   await parseListing(html, 1);
   const config = { ...discovered, profile: 'primary', verified_at: nowSeconds() };
   await saveConfig(env, config);
   return config;
+}
+async function expandYearLinks(config) {
+  try {
+    const yearIndex = await discover(await fetchSource('/year/'));
+    const combined = new Map(config.filters.map(f=>[f.path,f]));
+    for(const filter of yearIndex.filters) if(filter.type==='year') combined.set(filter.path,filter);
+    return {...config,filters:Array.from(combined.values())};
+  } catch { return config; }
 }
 async function saveConfig(env, config) {
   await env.FAMILY_DB.prepare('INSERT INTO parser_config(config_key,payload,updated_at) VALUES(?,?,?) ON CONFLICT(config_key) DO UPDATE SET payload=excluded.payload,updated_at=excluded.updated_at').bind('verified', JSON.stringify(config), nowSeconds()).run();
@@ -342,7 +350,7 @@ async function maintenance(env, ctx) {
   let config;
   try {
     const html = await fetchSource('/');
-    const menu = await discover(html);
+    const menu = await expandYearLinks(await discover(html));
     let profile = 'primary';
     try { await parseListing(html, 1, false, profile); }
     catch { profile = 'alternate'; await parseListing(html, 1, false, profile); report.repair = 'verified-alternate-selector'; }

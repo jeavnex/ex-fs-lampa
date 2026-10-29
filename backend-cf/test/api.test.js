@@ -128,6 +128,7 @@ test('maintenance preserves last good parser config on broken source instead of 
 test('maintenance selects and persists a verified structural fallback only after menu and search pass',async()=>{
   const menu='<a href="/film/">Фильмы</a><a href="/serials/">Сериалы</a><a href="/multfilm/">Мультфильмы</a><a href="/tv-show/">Передачи и шоу</a>';
   source('/',menu+'<article><a href="/film/321-new-layout.html"><img src="/uploads/new.jpg" alt="Новое кино"></a><a href="/film/321-new-layout.html">Новое кино</a></article>');
+  source('/year/',menu+'<a href="/year/1985/">1985</a>');
   source(/^\/index\.php\?/, '<div class="srx-item"><div class="srx-title"><a href="/multfilm/55-shrek.html">Шрек</a></div><img src="/uploads/shrek.jpg"></div>');
   // A cached sample is independently verified, rather than trusting the generic fallback alone.
   source('/film/123-test.html',detail);
@@ -135,4 +136,5 @@ test('maintenance selects and persists a verified structural fallback only after
   assert.equal(response.status,200);const report=await response.json();assert.equal(report.repair,'verified-alternate-selector');
   const config=JSON.parse((await db.prepare('SELECT payload FROM parser_config WHERE config_key=?').bind('verified').first()).payload);
   assert.equal(config.profile,'alternate');assert.equal(config.categories.shows,'/tv-show/');
+  assert.ok(config.filters.some(f=>f.path==='/year/1985/'));
 });

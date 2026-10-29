@@ -73,10 +73,11 @@ class FamilyActivity : Activity() {
         @JavascriptInterface fun play(value: String, index: Int) { runOnUiThread {
             try {
                 val item = JSONObject(value); val players = item.getJSONArray("players")
-                if (players.length() == 0 || index !in 0 until players.length()) return@runOnUiThread
+                val chosen = if (index < 0) FamilySupport.saved(this@FamilyActivity, item.optString("path")).optInt("player", 0).coerceIn(0, maxOf(0, players.length()-1)) else index
+                if (players.length() == 0 || chosen !in 0 until players.length()) return@runOnUiThread
                 // Large descriptions never cross Binder's transaction-size limit.
                 item.remove("description")
-                startActivity(Intent(this@FamilyActivity, FamilyPlayerActivity::class.java).putExtra("item", item.toString()).putExtra("index", index))
+                startActivity(Intent(this@FamilyActivity, FamilyPlayerActivity::class.java).putExtra("item", item.toString()).putExtra("index", chosen))
             } catch (e: Exception) { FamilySupport.log("Play request: ${e.message}") }
         } }
         @JavascriptInterface fun diagnostics(reason: String) { runOnUiThread { FamilySupport.diagnostics(this@FamilyActivity, reason) } }
@@ -121,6 +122,10 @@ class FamilyActivity : Activity() {
         web.postDelayed({ old.removeJavascriptInterface("FamilyMigration"); old.destroy() }, 3000)
     }
     override fun onBackPressed() { web.evaluateJavascript("window.FamilyBack && window.FamilyBack()", null) }
+    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent): Boolean {
+        if (keyCode in listOf(android.view.KeyEvent.KEYCODE_SEARCH, android.view.KeyEvent.KEYCODE_VOICE_ASSIST, android.view.KeyEvent.KEYCODE_ASSIST)) { Bridge().voiceSearch(); return true }
+        return super.onKeyDown(keyCode, event)
+    }
     override fun onResume() { super.onResume(); if (::web.isInitialized) { web.onResume(); web.evaluateJavascript("window.FamilyReturned && window.FamilyReturned()", null) } }
     override fun onPause() { web.onPause(); super.onPause() }
     override fun onDestroy() { web.removeJavascriptInterface("Family"); web.destroy(); super.onDestroy() }
