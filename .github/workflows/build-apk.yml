@@ -58,6 +58,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           python3 scripts/publish-apk.py metadata apk-output
+          node --input-type=module <<'JS'
+          import {readFileSync} from 'node:fs';
+          const local=JSON.parse(readFileSync('apk-output/version.json','utf8'));
+          const response=await fetch('https://family-cinema-api.pvde.workers.dev/api/version',{signal:AbortSignal.timeout(20000)});
+          if(response.ok){const published=await response.json();if(published.version_code>=local.version_code)throw Error('A current or newer APK is already published. Start a new workflow run instead of rerunning an old one.');}
+          else if(response.status!==503)throw Error('Cannot verify the current published version: HTTP '+response.status);
+          JS
           gh release view latest >/dev/null 2>&1 || gh release create latest --target "$GITHUB_SHA" --title 'Домашнее кино — актуальная сборка' --notes 'Постоянный файл FamilyCinema.apk. Устанавливается поверх прежней версии с тем же ключом подписи.'
           gh release upload latest apk-output/FamilyCinema.apk apk-output/version.json apk-output/SHA256SUMS.txt --clobber
           gh release edit latest --target "$GITHUB_SHA" --latest
